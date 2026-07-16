@@ -67,7 +67,7 @@ select, input { font-family: inherit; }
 }
 .field { margin-bottom: 18px; }
 .field > label { display: block; font-size: 13px; color: var(--text-2); margin-bottom: 8px; }
-.field input[type=text], .field input[type=password], .field select {
+.field input[type=text], .field input[type=password], .field input[type=number], .field select {
   width: 100%; padding: 11px 12px; background: var(--bg-2); color: var(--text);
   border: 1px solid var(--line); border-radius: 10px; font-size: 14px; outline: none;
   transition: .2s;
@@ -106,7 +106,7 @@ select, input { font-family: inherit; }
   display: grid;
   grid-template-columns: minmax(300px, 1fr) minmax(360px, 440px);
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
 }
 @media (max-width: 860px) {
   .chart-layout { grid-template-columns: 1fr; }
@@ -121,9 +121,6 @@ select, input { font-family: inherit; }
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
-  position: sticky;
-  top: 70px;
-  max-height: calc(100vh - 100px);
 }
 .main-chat-panel h3 { font-size: 15px; color: var(--gold); margin-bottom: 12px; }
 
@@ -199,7 +196,7 @@ select, input { font-family: inherit; }
 .chat-box {
   flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
   margin-bottom: 12px; padding-right: 4px;
-  min-height: 200px; max-height: calc(100vh - 280px);
+  min-height: 320px;
 }
 .chat-msg { max-width: 88%; padding: 10px 14px; border-radius: 14px; font-size: 13.5px; line-height: 1.7; }
 .chat-msg.user { align-self: flex-end; background: linear-gradient(135deg,var(--gold),var(--gold-2)); color: #1a1300; border-bottom-right-radius: 3px; }

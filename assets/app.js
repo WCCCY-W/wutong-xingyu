@@ -141,7 +141,7 @@ ZW.app = (function () {
     renderChart();
 
     let hint = `已按${state.cal === 'lunar' ? '农历' : '公历'} ${date} 排出命盘`;
-    if (input.mindNum) hint += ` · 心念数字 ${input.mindNum}`;
+    if (input.mindNum) hint += ` · 灵感数字 ${input.mindNum}`;
     if (corr.offset && !state.unknownTime && corr.timeIndex !== rawTime)
       hint += `（真太阳时校正约 ${corr.offset > 0 ? '+' : ''}${corr.offset}h，时辰已调整）`;
     if (state.unknownTime)

@@ -155,7 +155,7 @@ ZW.interpret = (function () {
 
   function buildChartContext(c) {
     const lines = [];
-    lines.push(`【基本信息】${c.meta.name}，${c.meta.gender}，生日${c.meta.date}${c.meta.isLunar ? '(农历)' : ''}，${c.meta.time}（${c.meta.timeRange}），生肖${c.meta.zodiac}，星座${c.meta.sign}，五行局${c.meta.fiveElementsClass}，出生地${c.meta.city || '未知'}。${c.meta.mindNum ? `心念数字：${c.meta.mindNum}` : ''}`);
+    lines.push(`【基本信息】${c.meta.name}，${c.meta.gender}，生日${c.meta.date}${c.meta.isLunar ? '(农历)' : ''}，${c.meta.time}（${c.meta.timeRange}），生肖${c.meta.zodiac}，星座${c.meta.sign}，五行局${c.meta.fiveElementsClass}，出生地${c.meta.city || '未知'}。${c.meta.mindNum ? `灵感数字：${c.meta.mindNum}` : ''}`);
     lines.push(`【命宫】${c.soul || '未知'}（${c.soulBranch || ''}），【身宫】${c.body || '未知'}（${c.bodyBranch || ''}）`);
     c.palaces.forEach((p) => {
       const maj = (p.majorStars || []).map((s) => s.name + (s.mutagen ? '化' + s.mutagen : '') + (s.brightness ? '(' + s.brightness + ')' : '')).join(' ');
