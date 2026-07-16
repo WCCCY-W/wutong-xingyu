@@ -107,6 +107,7 @@ select, input { font-family: inherit; }
   grid-template-columns: minmax(300px, 1fr) minmax(360px, 440px);
   gap: 20px;
   align-items: stretch;
+  max-height: calc(100vh - 140px); /* 锁定最大高度 = 视口 - 顶栏 - padding */
 }
 @media (max-width: 860px) {
   .chart-layout { grid-template-columns: 1fr; }

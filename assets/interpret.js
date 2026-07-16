@@ -147,8 +147,9 @@ ZW.interpret = (function () {
 吉格如紫府同宫、机月同梁、禄马交驰、火贪格、魁钺夹命；凶格如廉贞三凶、羊陀迭并、空劫夹命。
 
 重要规则：
-- 你无法联网搜索，也没有实时信息。当用户问赛事结果/新闻/实时数据时，基于你训练数据中的知识给出分析（如从命盘角度推断趋势），并明确说明"以下基于命理推演，非实时资讯"。
-- 若用户问的完全超出命理范畴（如具体比赛比分），可结合命盘五行生克做趣味性推断，但务必标注"仅供娱乐参考"。
+- 你已启用联网搜索能力。当用户问赛事结果/新闻/实时数据时，请主动利用联网功能获取最新信息，结合命盘五行生克做综合分析。
+- 若联网获取失败或信息不足，基于你训练数据中的知识给出分析，并明确说明"以下为命理推演与已有知识结合的分析"。
+- 回答中涉及实时信息时，请标注信息来源或时间范围，体现专业性。
 
 风格要求：
 - 简体中文，亲切自然如师傅讲盘，不神秘玄乎
@@ -180,14 +181,22 @@ ZW.interpret = (function () {
     const model = (cfg.model && cfg.model.trim()) || DEFAULT_PROVIDER.model;
     const sys = SYSTEM_PROMPT + '\n\n以下是命主完整命盘数据，请基于此解读：\n' + buildChartContext(c);
     const url = base.replace(/\/+$/, '') + '/chat/completions';
+
+    // DeepSeek 联网搜索支持
+    const isDeepSeek = base.indexOf('deepseek.com') >= 0 || (cfg.provider === 'deepseek');
+    const requestBody = {
+      model: model,
+      messages: [{ role: 'system', content: sys }].concat(messages),
+      stream: true, temperature: 0.8,
+    };
+    if (isDeepSeek) {
+      requestBody.web_search = { enable: true };
+    }
+
     fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apikey },
-      body: JSON.stringify({
-        model: model,
-        messages: [{ role: 'system', content: sys }].concat(messages),
-        stream: true, temperature: 0.8,
-      }),
+      body: JSON.stringify(requestBody),
     }).then(async (r) => {
       if (!r.ok) {
         let errBody = '';
