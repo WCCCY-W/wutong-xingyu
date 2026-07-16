@@ -121,6 +121,7 @@ select, input { font-family: inherit; }
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 .main-chat-panel h3 { font-size: 15px; color: var(--gold); margin-bottom: 12px; }
 
@@ -194,9 +195,14 @@ select, input { font-family: inherit; }
 
 /* AI 对话（左侧主面板） */
 .chat-box {
-  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
-  margin-bottom: 12px; padding-right: 4px;
-  min-height: 320px;
+  flex: 1;
+  min-height: 0;  /* 关键：允许 flex 子项收缩到比内容更小，配合 overflow-y:auto 实现内部滚动 */
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-right: 4px;
 }
 .chat-msg { max-width: 88%; padding: 10px 14px; border-radius: 14px; font-size: 13.5px; line-height: 1.7; }
 .chat-msg.user { align-self: flex-end; background: linear-gradient(135deg,var(--gold),var(--gold-2)); color: #1a1300; border-bottom-right-radius: 3px; }
