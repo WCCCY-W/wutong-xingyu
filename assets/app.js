@@ -160,6 +160,7 @@ ZW.app = (function () {
     // 重置对话
     state.chat = [];
     $('chat-box').innerHTML = '';
+    $('chat-box').scrollTop = 0; // 初始滚动到顶部，与右侧顶部对齐
     renderChatQuick();
   }
 

@@ -180,10 +180,16 @@ ZW.interpret = (function () {
     if (!cfg || !cfg.apikey) { cb.onError && cb.onError('未配置 LLM（设置里填 Key 即启用增强）'); return; }
     const base = (cfg.baseurl && cfg.baseurl.trim()) || DEFAULT_PROVIDER.baseurl;
     const model = (cfg.model && cfg.model.trim()) || DEFAULT_PROVIDER.model;
-    const sys = SYSTEM_PROMPT + '\n\n以下是命主完整命盘数据，请基于此解读：\n' + buildChartContext(c);
+
+    // 注入当前日期时间到系统提示词（LLM 不知道"现在"是哪年哪月）
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+    const timeStr = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    const sys = SYSTEM_PROMPT + `\n\n【当前时间】今天是 ${dateStr} ${timeStr}。回答中涉及"当前""今天""今年"等时间概念时，请以此为准。`
+      + '\n\n以下是命主完整命盘数据，请基于此解读：\n' + buildChartContext(c);
     const url = base.replace(/\/+$/, '') + '/chat/completions';
 
-    // DeepSeek 联网搜索支持
+    // DeepSeek 联网搜索支持（仅 deepseek-chat / deepseek-reasoner 模型支持）
     const isDeepSeek = base.indexOf('deepseek.com') >= 0 || (cfg.provider === 'deepseek');
     const requestBody = {
       model: model,
