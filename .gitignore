@@ -1,0 +1,13 @@
+# 项目数据（不入库，仅本地用）
+.workbuddy/
+
+# 开发/验证脚本（非站点资源）
+validate.js
+sim.js
+probe*.js
+verify*.js
+
+# 系统文件
+.DS_Store
+Thumbs.db
+*.log

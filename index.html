@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>梧桐星语 · 紫微斗数推演</title>
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+  <!-- 顶栏 -->
+  <header class="topbar">
+    <div class="brand" onclick="ZW.app.goInput()">
+      <span class="brand-mark">🌳</span>
+      <span class="brand-name">梧桐星语</span>
+      <span class="brand-sub">紫微斗数推演</span>
+    </div>
+    <nav class="nav">
+      <button class="nav-btn active" data-screen="input" onclick="ZW.app.switchScreen('input')">测算</button>
+      <button class="nav-btn" data-screen="history" onclick="ZW.app.switchScreen('history')">占卜记录</button>
+      <button class="nav-btn icon" onclick="ZW.app.openSettings()" title="设置">⚙</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <!-- ============ 屏幕一：输入 ============ -->
+    <section id="screen-input" class="screen active">
+      <div class="intro">
+        <h1>开启你的星盘推演</h1>
+        <p>输入出生信息，梧桐星语为你排出十二宫紫微命盘，解读命格、性格、事业、财运、婚姻与流年大限。</p>
+      </div>
+      <form id="birth-form" class="birth-form" onsubmit="return false;">
+        <div class="field">
+          <label>姓名（可选）</label>
+          <input type="text" id="f-name" placeholder="留空则显示匿名" maxlength="12" />
+        </div>
+
+        <div class="field">
+          <label>出生日期</label>
+          <div class="cal-toggle">
+            <button type="button" class="cal-opt active" data-cal="solar" onclick="ZW.app.toggleCal('solar')">公历</button>
+            <button type="button" class="cal-opt" data-cal="lunar" onclick="ZW.app.toggleCal('lunar')">农历</button>
+          </div>
+          <div class="date-row">
+            <select id="f-year"></select>
+            <select id="f-month"></select>
+            <select id="f-day"></select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>出生时辰</label>
+          <div class="time-row">
+            <select id="f-time"></select>
+            <label class="unknown-chk"><input type="checkbox" id="f-unknown" onchange="ZW.app.onUnknownTime(this)" /> 不知道时辰</label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>出生地（用于真太阳时校正）</label>
+          <select id="f-city"></select>
+        </div>
+
+        <div class="field">
+          <label>性别</label>
+          <div class="gender-toggle">
+            <button type="button" class="gender-opt active" data-gender="male" onclick="ZW.app.toggleGender('male')">男</button>
+            <button type="button" class="gender-opt" data-gender="female" onclick="ZW.app.toggleGender('female')">女</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>心念数字（可选，1-100）</label>
+          <input type="number" id="f-mindnum" placeholder="测算前心中默念一个数字，增强仪式感" min="1" max="100" />
+          <span class="field-hint">起卦时心中默想的数字，用于增加占卜的灵性连接</span>
+        </div>
+
+        <button class="primary-btn" id="f-submit" onclick="ZW.app.submit()">开启星盘测算 ⟡</button>
+        <p class="hint" id="form-hint"></p>
+      </form>
+    </section>
+
+    <!-- ============ 屏幕二：命盘 ============ -->
+    <section id="screen-chart" class="screen">
+      <div class="chart-header">
+        <div class="chart-title">
+          <h2 id="chart-name">命盘</h2>
+          <span id="chart-meta" class="chart-meta"></span>
+        </div>
+        <div class="time-tabs">
+          <button class="time-tab active" data-view="born" onclick="ZW.app.setView('born')">本命</button>
+          <button class="time-tab" data-view="decadal" onclick="ZW.app.setView('decadal')">大限</button>
+          <button class="time-tab" data-view="year" onclick="ZW.app.setView('year')">流年</button>
+        </div>
+      </div>
+
+      <!-- 主布局：左侧 AI 对话 / 右侧 棋盘+格局 -->
+      <div class="chart-layout">
+        <!-- 左栏：AI 推演对话 -->
+        <aside class="main-chat-panel">
+          <h3>AI 推演对话</h3>
+          <div id="chat-box" class="chat-box"></div>
+          <div class="chat-input-row">
+            <input type="text" id="chat-input" placeholder="问问命盘的事，如：我今年事业如何？" onkeydown="if(event.key==='Enter')ZW.app.sendChat()" />
+            <button class="chat-send" onclick="ZW.app.sendChat()">发送</button>
+          </div>
+        </aside>
+
+        <!-- 右栏：棋盘 + 格局 -->
+        <div class="right-col">
+          <div id="chart-board" class="chart-board"><!-- 棋盘由 JS 渲染 --></div>
+          <div class="panel patterns-panel">
+            <h3>格局判定</h3>
+            <div id="pattern-list" class="pattern-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部全宽：命盘解读 -->
+      <div class="panel insight-panel">
+        <h3>命盘解读</h3>
+        <div id="insight-list" class="insight-list"></div>
+      </div>
+    </section>
+
+    <!-- ============ 屏幕三：历史 ============ -->
+    <section id="screen-history" class="screen">
+      <div class="history-header">
+        <h2>占卜记录</h2>
+        <button class="ghost-btn" onclick="ZW.history.clearAll(ZW.app.renderHistory.bind(ZW.app))">清空全部</button>
+      </div>
+      <div id="history-list" class="history-list"></div>
+    </section>
+  </main>
+
+  <!-- 星曜详情弹窗 -->
+  <div id="modal-star" class="modal-mask" onclick="ZW.app.closeModal('modal-star')">
+    <div class="modal" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="ZW.app.closeModal('modal-star')">✕</button>
+      <div id="star-detail"></div>
+    </div>
+  </div>
+
+  <!-- 设置弹窗（LLM） -->
+  <div id="modal-settings" class="modal-mask" onclick="ZW.app.closeModal('modal-settings')">
+    <div class="modal" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="ZW.app.closeModal('modal-settings')">✕</button>
+      <h3>AI 增强设置</h3>
+      <p class="settings-note">默认开启 LLM 增强解读。选服务商 → 填免费 Key 即启用（Key 仅存你本机浏览器，不上传）。未填 Key 时自动用本地模板解读。</p>
+      <div class="field">
+        <label>服务商（选一个，自动填好接口与模型）</label>
+        <select id="set-provider" onchange="ZW.app.onProviderChange()">
+          <option value="deepseek">DeepSeek（推荐·国内直连）</option>
+          <option value="gemini">Google Gemini（免费 tier）</option>
+          <option value="siliconflow">硅基流动 SiliconFlow</option>
+          <option value="qwen">通义千问 DashScope</option>
+          <option value="volcano">火山方舟（字节）</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>接口地址（Base URL）</label>
+        <input type="text" id="set-baseurl" placeholder="https://api.deepseek.com/v1" />
+      </div>
+      <div class="field">
+        <label>API Key</label>
+        <input type="password" id="set-apikey" placeholder="sk-..." />
+      </div>
+      <div class="field">
+        <label>模型名</label>
+        <input type="text" id="set-model" placeholder="deepseek-chat" />
+      </div>
+      <div class="field">
+        <label>预设问题（可选，逗号分隔）</label>
+        <input type="text" id="set-questions" placeholder="性格,事业,财运" />
+      </div>
+      <div class="settings-actions">
+        <button class="ghost-btn" onclick="ZW.app.resetSettings()">恢复默认</button>
+        <button class="primary-btn" onclick="ZW.app.saveSettings()">保存</button>
+      </div>
+      <p class="hint" id="settings-hint"></p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <!-- 脚本：先 iztro 库，再数据层，最后控制器 -->
+  <script src="assets/iztro.js"></script>
+  <script src="assets/constants.js"></script>
+  <script src="assets/cities.js"></script>
+  <script src="assets/chart-core.js"></script>
+  <script src="assets/history.js"></script>
+  <script src="assets/interpret.js"></script>
+  <script src="assets/render.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>
