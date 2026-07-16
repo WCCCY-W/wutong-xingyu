@@ -147,10 +147,11 @@ ZW.interpret = (function () {
 吉格如紫府同宫、机月同梁、禄马交驰、火贪格、魁钺夹命；凶格如廉贞三凶、羊陀迭并、空劫夹命。
 
 重要规则：
-- 你已启用联网搜索（web_search），可直接获取实时信息。当用户问赛事、新闻、比分、天气等时效性问题时，**必须先通过联网搜索确认最新事实**，再结合命盘分析。
+- 你已启用联网搜索（enable_search），可直接获取实时信息。当用户问赛事、新闻、比分、天气等时效性问题时，**必须先通过联网搜索确认最新事实**，再结合命盘分析。
 - 搜索策略：用具体关键词搜索，如"2025年世界杯季军赛"、"FIFA Club World Cup 2025 result"等。不要只搜笼统词如"世界杯"。
 - 核实日期：搜索结果中的日期必须与"当前时间"吻合。如果搜到的信息是未来或过去很久的赛事，说明搜错了，请换更精确的关键词重搜。
-- 若联网确实失败或无结果，明确告知用户"联网未获取到最新数据"，再基于已有知识做命理推断，并标注"⚠ 非实时信息，仅供参考"。
+- **诚实原则**：如果你确实没有获取到实时搜索结果（没有看到新的网页内容/来源），请明确告诉用户"⚠ 未能获取到实时数据"，然后基于已有知识做命理推断并标注"⚠ 非实时信息，仅供参考"。**绝对不要编造搜索结果或假装已经联网。**
+- 回答中若引用了联网搜索的信息，请标注具体来源或时间范围。
 
 风格要求：
 - 简体中文，亲切自然如师傅讲盘，不神秘玄乎
@@ -189,7 +190,9 @@ ZW.interpret = (function () {
       + '\n\n以下是命主完整命盘数据，请基于此解读：\n' + buildChartContext(c);
     const url = base.replace(/\/+$/, '') + '/chat/completions';
 
-    // DeepSeek 联网搜索支持（仅 deepseek-chat / deepseek-reasoner 模型支持）
+    // DeepSeek 联网搜索支持（需在 DeepSeek 控制台额外开通后付费/资源包）
+    // 正确参数名：enable_search (Boolean)，非 web_search 对象
+    // 参考：腾讯云 DeepSeek 文档 / 移动云 API 文档
     const isDeepSeek = base.indexOf('deepseek.com') >= 0 || (cfg.provider === 'deepseek');
     const requestBody = {
       model: model,
@@ -197,7 +200,7 @@ ZW.interpret = (function () {
       stream: true, temperature: 0.8,
     };
     if (isDeepSeek) {
-      requestBody.web_search = { enable: true };
+      requestBody.enable_search = true; // 正确参数名！
     }
 
     fetch(url, {
