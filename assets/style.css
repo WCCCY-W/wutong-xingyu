@@ -107,10 +107,11 @@ select, input { font-family: inherit; }
   grid-template-columns: minmax(300px, 1fr) minmax(360px, 440px);
   gap: 20px;
   align-items: stretch;
-  max-height: calc(100vh - 140px); /* 锁定最大高度 = 视口 - 顶栏 - padding */
+  height: calc(100vh - 180px); /* 硬锁高度 = 视口 - 顶栏 - header - padding */
+  overflow: hidden; /* 裁剪超出部分，强制子项在高度内滚动 */
 }
 @media (max-width: 860px) {
-  .chart-layout { grid-template-columns: 1fr; }
+  .chart-layout { grid-template-columns: 1fr; height: auto; overflow: visible; }
 }
 
 /* 左栏：AI 对话 */
@@ -123,6 +124,7 @@ select, input { font-family: inherit; }
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0; /* 允许在 grid cell 内收缩 */
 }
 .main-chat-panel h3 { font-size: 15px; color: var(--gold); margin-bottom: 12px; }
 
