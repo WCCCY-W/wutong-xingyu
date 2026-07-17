@@ -357,6 +357,24 @@ ZW.interpret = (function () {
         }));
 
         const next = msgs.concat([assistMsg, ...toolMsgs]);
+        // 第二轮：注入"数据引用指令"，强制模型逐字引用搜索结果的原始数值
+        if (results.length && results[0].text && results[0].text !== '（联网搜索未检索到相关结果）') {
+          const dataInstruction = {
+            role: 'user',
+            content: [
+                '【⚠️ 数据引用强制指令】',
+                '上面工具返回的搜索结果是本次问答的唯一事实来源。',
+                '',
+                '作答规则（必须遵守，违反则答案不可信）：',
+                '1. 涉及任何数值（指数、涨跌幅、比分、金额、日期等），必须从上面的搜索结果中【逐字原样摘录】，禁止用自己计算的或记忆中的数字替代。',
+                '2. 如果搜索结果中没有某项具体数据（如某个指数的具体点位），明确写"搜索结果未提供此数据"，禁止编造看起来合理的数字。',
+                '3. 可以基于这些真实数据进行命理五行分析，但分析部分必须和事实数据明显区分开。',
+                '',
+                '请基于以上规则，结合命盘知识回答用户的问题。',
+              ].join('\n'),
+          };
+          next.push(dataInstruction);
+        }
         runTurn(next, false); // 第二轮：不带工具，模型基于真实搜索结果作答
       }).catch((err) => {
         const em = (err && err.message) ? err.message : String(err);
