@@ -301,28 +301,71 @@ ZW.interpret = (function () {
 
     // 一轮流结束：若模型触发了 search_web，则执行搜索并把结果回灌，再跑第二轮
     function finishTurn(msgs, fullContent, toolCalls) {
-      const tc = toolCalls.find((t) => t.function && t.function.name === 'search_web');
-      if (!tc) { cb.onDone && cb.onDone(); return; }
+      const activeTc = toolCalls.filter((t) => t.function && t.function.name === 'search_web');
+      if (!activeTc.length) { cb.onDone && cb.onDone(); return; }
 
-      let q = '';
-      try { q = (JSON.parse(tc.function.arguments || '{}').query) || ''; } catch (e) { q = ''; }
-      cb.onToolUse && cb.onToolUse(q);
-      cb.onSearch && cb.onSearch('pending');
+      // 对所有 tool_calls 逐一回应（API 要求每个 tool_call_id 都有对应 tool 消息）
+      const toolResponses = toolCalls.map((tc) => {
+        if (tc.function && tc.function.name === 'search_web') {
+          let q = '';
+          try { q = (JSON.parse(tc.function.arguments || '{}').query) || ''; } catch (e) { q = ''; }
+          // 只对第一个 search_web 触发 UI 回调（避免重复提示）
+          if (tc === activeTc[0]) {
+            cb.onToolUse && cb.onToolUse(q);
+            cb.onSearch && cb.onSearch('pending');
+          }
+          return { call: tc, query: q, handled: true };
+        }
+        // 非搜索工具（未来扩展）：直接返回"不支持"
+        return { call: tc, query: '', handled: false };
+      });
 
-      searchWeb(q).then((res) => {
-        cb.onSearch && cb.onSearch('done', res.summary);
-        const next = msgs.concat([
-          { role: 'assistant', content: fullContent, tool_calls: toolCalls },
-          { role: 'tool', tool_call_id: tc.id, content: res.text },
-        ]);
+      const searchPromises = toolResponses.map((tr) => {
+        if (!tr.handled) return Promise.resolve({ text: '该工具暂不支持', summary: '0 条' });
+        return tr.query ? searchWeb(tr.query) : Promise.resolve({ text: '（无查询关键词）', summary: '0 条' });
+      });
+
+      Promise.all(searchPromises).then((results) => {
+        // UI 更新（只触发一次）
+        if (results.length) cb.onSearch && cb.onSearch('done', results[0].summary);
+
+        // 构建 assistant + tool 消息对
+        // 关键：content 为空时必须传 null，不能传 ""，否则 DeepSeek V4 报错
+        const assistMsg = {
+          role: 'assistant',
+          content: fullContent || null,
+          tool_calls: toolCalls.map((tc) => ({
+            id: tc.id,
+            type: tc.type || 'function',
+            function: { name: tc.function.name, arguments: tc.function.arguments },
+          })),
+        };
+        const toolMsgs = results.map((res, i) => ({
+          role: 'tool',
+          tool_call_id: toolResponses[i].call.id,
+          content: res.text,
+        }));
+
+        const next = msgs.concat([assistMsg, ...toolMsgs]);
         runTurn(next, false); // 第二轮：不带工具，模型基于真实搜索结果作答
       }).catch((err) => {
         const em = (err && err.message) ? err.message : String(err);
         cb.onSearch && cb.onSearch('error', em);
-        const next = msgs.concat([
-          { role: 'assistant', content: fullContent, tool_calls: toolCalls },
-          { role: 'tool', tool_call_id: tc.id, content: '搜索失败：' + em },
-        ]);
+        const assistMsg = {
+          role: 'assistant',
+          content: fullContent || null,
+          tool_calls: toolCalls.map((tc) => ({
+            id: tc.id,
+            type: tc.type || 'function',
+            function: { name: tc.function.name, arguments: tc.function.arguments },
+          })),
+        };
+        const toolMsgs = toolResponses.map((tr) => ({
+          role: 'tool',
+          tool_call_id: tr.call.id,
+          content: tr.handled ? ('搜索失败：' + em) : '该工具暂不支持',
+        }));
+        const next = msgs.concat([assistMsg, ...toolMsgs]);
         runTurn(next, false);
       });
     }
