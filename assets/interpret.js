@@ -270,7 +270,10 @@ ZW.interpret = (function () {
               const j = JSON.parse(d);
               const delta = j.choices && j.choices[0] && j.choices[0].delta;
               if (!delta) continue;
-              if (delta.content) { fullContent += delta.content; cb.onDelta && cb.onDelta(delta.content); }
+              // 第一轮（工具调用轮）静默收集，不向用户展示内容
+              // 原因：DeepSeek V4 会将 tool_calls 以 DSML 文本格式写入 content 字段，
+              //       若直接渲染会暴露 "<|DSML|>tool_calls<|...|" 等内部指令
+              if (delta.content) { fullContent += delta.content; if (!useTools) cb.onDelta && cb.onDelta(delta.content); }
               if (delta.tool_calls) accumulateToolCalls(toolCalls, delta.tool_calls);
             } catch (e) { /* 忽略心跳 */ }
           }
@@ -304,7 +307,12 @@ ZW.interpret = (function () {
     // 一轮流结束：若模型触发了 search_web，则执行搜索并把结果回灌，再跑第二轮
     function finishTurn(msgs, fullContent, toolCalls) {
       const activeTc = toolCalls.filter((t) => t.function && t.function.name === 'search_web');
-      if (!activeTc.length) { cb.onDone && cb.onDone(); return; }
+      // 没有工具调用 → 第一轮就是最终回答（普通问题不需要搜索），展示内容并结束
+      if (!activeTc.length) {
+        if (fullContent) { cb.onDelta && cb.onDelta(fullContent); }
+        cb.onDone && cb.onDone();
+        return;
+      }
 
       // 对所有 tool_calls 逐一回应（API 要求每个 tool_call_id 都有对应 tool 消息）
       const toolResponses = toolCalls.map((tc) => {
