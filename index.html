@@ -166,7 +166,12 @@
       </div>
       <div class="field">
         <label>模型名</label>
-        <input type="text" id="set-model" placeholder="deepseek-chat" />
+        <input type="text" id="set-model" placeholder="deepseek-v4-flash" />
+      </div>
+      <div class="field">
+        <label>搜索代理 URL（联网搜索 · Cloudflare Worker）</label>
+        <input type="text" id="set-searchurl" placeholder="https://wutong-search.xxx.workers.dev" />
+        <p class="field-hint">实现「真正联网搜索」所需。部署一个免费 Cloudflare Worker 填入此 URL 即可（详见仓库根目录 SEARCH_WORKER.md）。不填则 AI 无法联网，仅基于命盘与训练知识作答。</p>
       </div>
       <div class="field">
         <label>预设问题（可选，逗号分隔）</label>

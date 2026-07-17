@@ -307,8 +307,27 @@ ZW.app = (function () {
 
     const aiDiv = appendMsg('ai', '');
     let buf = '';
+    let toolNode = null;
+    const scrollBottom = () => { const box = $('chat-box'); box.scrollTop = box.scrollHeight; };
     ZW.interpret.llm(state.chart, state.chat.slice(0, -1).concat([{ role: 'user', content: text }]), {
-      onDelta: (d) => { buf += d; aiDiv.innerHTML = renderMarkdown(buf); $('chat-box').scrollTop = $('chat-box').scrollHeight; },
+      onDelta: (d) => { buf += d; aiDiv.innerHTML = renderMarkdown(buf); scrollBottom(); },
+      onToolUse: (label) => {
+        toolNode = document.createElement('div');
+        toolNode.className = 'tool-call pending';
+        toolNode.textContent = '🔍 正在搜索：' + (label || '（实时信息）');
+        $('chat-box').appendChild(toolNode);
+        scrollBottom();
+      },
+      onSearch: (status, detail) => {
+        if (!toolNode) return;
+        if (status === 'done') {
+          toolNode.className = 'tool-call done';
+          toolNode.textContent = '🔍 已检索 ' + (detail || '') + ' 资料，正在结合命盘分析…';
+        } else if (status === 'error') {
+          toolNode.className = 'tool-call error';
+          toolNode.textContent = '⚠ 搜索失败：' + (detail || '未知错误');
+        }
+      },
       onDone: () => { state.chat.push({ role: 'assistant', content: buf }); },
       onError: (msg) => {
         const fallback = '⚠ ' + msg + '\n\n（已切换本地模板解读）\n' + localAnswer(text);
@@ -344,6 +363,7 @@ ZW.app = (function () {
       $('set-baseurl').value = cfg.baseurl || '';
       $('set-apikey').value = cfg.apikey || '';
       $('set-model').value = cfg.model || '';
+      $('set-searchurl').value = cfg.searchUrl || '';
       $('set-questions').value = cfg.questions || DEFAULT_QUESTIONS;
       updateProviderNote();
     } catch (e) { /* ignore */ }
@@ -379,6 +399,7 @@ ZW.app = (function () {
       baseurl: $('set-baseurl').value.trim(),
       apikey: $('set-apikey').value.trim(),
       model: $('set-model').value.trim(),
+      searchUrl: $('set-searchurl').value.trim(),
       questions: $('set-questions').value.trim() || DEFAULT_QUESTIONS,
     };
     try { localStorage.setItem(LLM_KEY, JSON.stringify(cfg)); } catch (e) { }
@@ -389,7 +410,8 @@ ZW.app = (function () {
     $('set-provider').value = 'deepseek';
     $('set-baseurl').value = 'https://api.deepseek.com/v1';
     $('set-apikey').value = '';
-    $('set-model').value = 'deepseek-chat';
+    $('set-model').value = 'deepseek-v4-flash';
+    $('set-searchurl').value = '';
     $('set-questions').value = DEFAULT_QUESTIONS;
     updateProviderNote();
   }

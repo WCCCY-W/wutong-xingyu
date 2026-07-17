@@ -147,11 +147,11 @@ ZW.interpret = (function () {
 吉格如紫府同宫、机月同梁、禄马交驰、火贪格、魁钺夹命；凶格如廉贞三凶、羊陀迭并、空劫夹命。
 
 重要规则：
-- 你已启用联网搜索（enable_search），可直接获取实时信息。当用户问赛事、新闻、比分、天气等时效性问题时，**必须先通过联网搜索确认最新事实**，再结合命盘分析。
-- 搜索策略：用具体关键词搜索，如"2025年世界杯季军赛"、"FIFA Club World Cup 2025 result"等。不要只搜笼统词如"世界杯"。
-- 核实日期：搜索结果中的日期必须与"当前时间"吻合。如果搜到的信息是未来或过去很久的赛事，说明搜错了，请换更精确的关键词重搜。
-- **诚实原则**：如果你确实没有获取到实时搜索结果（没有看到新的网页内容/来源），请明确告诉用户"⚠ 未能获取到实时数据"，然后基于已有知识做命理推断并标注"⚠ 非实时信息，仅供参考"。**绝对不要编造搜索结果或假装已经联网。**
-- 回答中若引用了联网搜索的信息，请标注具体来源或时间范围。
+- 你拥有一个联网搜索工具 search_web，可在需要时主动调用以获取实时信息。当用户问赛事、新闻、比分、天气、股价等时效性问题，**应当调用 search_web 确认最新事实**，再结合命盘分析。
+- 调用策略：用具体关键词搜索，如"2026 世俱杯 季军赛 比分"、"FIFA Club World Cup 2026 result"等。不要只搜笼统词如"世界杯"。
+- 核实日期：搜索结果中的日期必须与"当前时间"吻合。若搜到的信息是未来或很久以前的赛事，说明搜错了，应换更精确的关键词重搜。
+- **诚实原则**：如果 search_web 返回为空或搜索失败，请明确告诉用户"⚠ 未能获取到实时数据"，再基于已有知识做命理推断并标注"⚠ 非实时信息，仅供参考"。**绝对不要编造搜索结果或假装已经联网。**
+- 回答中若引用了搜索到的信息，请标注具体来源或时间范围。
 
 风格要求：
 - 简体中文，亲切自然如师傅讲盘，不神秘玄乎
@@ -173,9 +173,48 @@ ZW.interpret = (function () {
   }
 
   // 默认服务商（baseurl / model 留空时回退到此）
-  const DEFAULT_PROVIDER = { baseurl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', label: 'DeepSeek' };
+  const DEFAULT_PROVIDER = { baseurl: 'https://api.deepseek.com/v1', model: 'deepseek-v4-flash', label: 'DeepSeek' };
 
-  // 流式调用 OpenAI 兼容接口
+  // 联网搜索工具定义（OpenAI 兼容 Tool Calls 格式）
+  const SEARCH_TOOL = {
+    type: 'function',
+    function: {
+      name: 'search_web',
+      description: '搜索实时信息：新闻、赛事比分、天气、股价、人物近期动态等。当用户问时效性事实、或你不确定某信息的真实性时调用。',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: '具体搜索关键词，务必精确，例如"2026 世俱杯 季军赛 比分"而非笼统的"世界杯"。' },
+        },
+        required: ['query'],
+      },
+    },
+  };
+
+  // 前端搜索代理（Cloudflare Worker）调用 —— 真正执行联网搜索的地方
+  async function searchWeb(query) {
+    const cfg = (ZW.app && ZW.app.getLLMConfig && ZW.app.getLLMConfig()) || {};
+    const workerUrl = (cfg.searchUrl && cfg.searchUrl.trim()) || '';
+    if (!workerUrl) throw new Error('未配置搜索代理 URL（设置里填 Cloudflare Worker 地址）');
+    const r = await fetch(workerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    });
+    if (!r.ok) {
+      const t = await r.text().catch(() => '');
+      throw new Error('搜索代理返回 ' + r.status + ' ' + t.slice(0, 200));
+    }
+    const data = await r.json().catch(() => ({}));
+    const results = Array.isArray(data.results) ? data.results : [];
+    if (!results.length) return { text: '（联网搜索未检索到相关结果）', summary: '0 条' };
+    const text = results
+      .map((x, i) => `[${i + 1}] ${x.title || ''}\n${x.url || ''}\n${x.content || ''}`)
+      .join('\n\n');
+    return { text, summary: results.length + ' 条' };
+  }
+
+  // 流式调用 OpenAI 兼容接口（支持 Tool Calls 联网：模型决定搜索 → 代理执行 → 结果回灌）
   function llm(c, messages, cb) {
     const cfg = (ZW.app && ZW.app.getLLMConfig && ZW.app.getLLMConfig()) || null;
     if (!cfg || !cfg.apikey) { cb.onError && cb.onError('未配置 LLM（设置里填 Key 即启用增强）'); return; }
@@ -190,59 +229,105 @@ ZW.interpret = (function () {
       + '\n\n以下是命主完整命盘数据，请基于此解读：\n' + buildChartContext(c);
     const url = base.replace(/\/+$/, '') + '/chat/completions';
 
-    // DeepSeek 联网搜索支持（需在 DeepSeek 控制台额外开通后付费/资源包）
-    // 正确参数名：enable_search (Boolean)，非 web_search 对象
-    // 参考：腾讯云 DeepSeek 文档 / 移动云 API 文档
-    const isDeepSeek = base.indexOf('deepseek.com') >= 0 || (cfg.provider === 'deepseek');
-    const requestBody = {
-      model: model,
-      messages: [{ role: 'system', content: sys }].concat(messages),
-      stream: true, temperature: 0.8,
-    };
-    if (isDeepSeek) {
-      requestBody.enable_search = true; // 正确参数名！
+    // 一轮对话：useTools=true 时附带 search_web 工具，让模型自行决定要不要联网
+    function runTurn(msgs, useTools) {
+      const body = {
+        model: model,
+        messages: [{ role: 'system', content: sys }].concat(msgs),
+        stream: true, temperature: 0.8,
+      };
+      if (useTools) body.tools = [SEARCH_TOOL];
+
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apikey },
+        body: JSON.stringify(body),
+      }).then(async (r) => {
+        if (!r.ok) {
+          let errBody = '';
+          try { errBody = await r.text(); } catch (e2) { /* ignore */ }
+          const detail = errBody ? (' · ' + errBody.slice(0, 300)) : '';
+          cb.onError && cb.onError('接口返回 ' + r.status + detail +
+            (r.status === 404 ? '\n（可能原因：模型名不存在 / URL 错误 / 请检查设置）' : ''));
+          return;
+        }
+        const reader = r.body.getReader();
+        const dec = new TextDecoder();
+        let buf = '';
+        let fullContent = '';
+        let toolCalls = [];
+        const pump = () => reader.read().then(({ done, value }) => {
+          if (done) { finishTurn(msgs, fullContent, toolCalls); return; }
+          buf += dec.decode(value, { stream: true });
+          const lines = buf.split('\n'); buf = lines.pop();
+          for (const line of lines) {
+            if (!line.startsWith('data:')) continue;
+            const d = line.slice(5).trim();
+            if (d === '[DONE]') { finishTurn(msgs, fullContent, toolCalls); return; }
+            try {
+              const j = JSON.parse(d);
+              const delta = j.choices && j.choices[0] && j.choices[0].delta;
+              if (!delta) continue;
+              if (delta.content) { fullContent += delta.content; cb.onDelta && cb.onDelta(delta.content); }
+              if (delta.tool_calls) accumulateToolCalls(toolCalls, delta.tool_calls);
+            } catch (e) { /* 忽略心跳 */ }
+          }
+          return pump();
+        });
+        pump();
+      }).catch((e) => {
+        const msg = e.message || String(e);
+        const hint = (msg.indexOf('fetch') >= 0 || msg.indexOf('Failed') >= 0 || msg.indexOf('Network') >= 0 || msg.indexOf('CORS') >= 0)
+          ? '\n（CORS 被浏览器拦截：file:// 页面无法调用外部 API。请将页面部署到 Web 服务器后使用 AI 增强功能）'
+          : '';
+        cb.onError && cb.onError(msg + hint);
+      });
     }
 
-    fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apikey },
-      body: JSON.stringify(requestBody),
-    }).then(async (r) => {
-      if (!r.ok) {
-        let errBody = '';
-        try { errBody = await r.text(); } catch(e2) { /* ignore */ }
-        const detail = errBody ? (' · ' + errBody.slice(0, 300)) : '';
-        cb.onError && cb.onError('接口返回 ' + r.status + detail +
-          (r.status === 404 ? '\n（可能原因：模型名不存在 / URL 错误 / 请检查设置）' : ''));
-        return;
-      }
-      const reader = r.body.getReader();
-      const dec = new TextDecoder();
-      let buf = '';
-      const pump = () => reader.read().then(({ done, value }) => {
-        if (done) { cb.onDone && cb.onDone(); return; }
-        buf += dec.decode(value, { stream: true });
-        const lines = buf.split('\n'); buf = lines.pop();
-        for (const line of lines) {
-          if (!line.startsWith('data:')) continue;
-          const d = line.slice(5).trim();
-          if (d === '[DONE]') { cb.onDone && cb.onDone(); return; }
-          try {
-            const j = JSON.parse(d);
-            const delta = j.choices && j.choices[0] && j.choices[0].delta;
-            if (delta && delta.content) cb.onDelta && cb.onDelta(delta.content);
-          } catch (e) { /* 忽略心跳 */ }
+    // 累积流式分片的 tool_calls（OpenAI 格式：arguments 是分片拼接的 JSON 字符串）
+    function accumulateToolCalls(store, deltas) {
+      for (const tc of deltas) {
+        const idx = (tc.index != null) ? tc.index : store.length;
+        if (idx >= store.length) store.push({ id: '', type: 'function', function: { name: '', arguments: '' } });
+        const cur = store[idx];
+        if (tc.id) cur.id = tc.id;
+        if (tc.type) cur.type = tc.type;
+        if (tc.function) {
+          if (tc.function.name) cur.function.name += tc.function.name;
+          if (tc.function.arguments) cur.function.arguments += tc.function.arguments;
         }
-        return pump();
+      }
+    }
+
+    // 一轮流结束：若模型触发了 search_web，则执行搜索并把结果回灌，再跑第二轮
+    function finishTurn(msgs, fullContent, toolCalls) {
+      const tc = toolCalls.find((t) => t.function && t.function.name === 'search_web');
+      if (!tc) { cb.onDone && cb.onDone(); return; }
+
+      let q = '';
+      try { q = (JSON.parse(tc.function.arguments || '{}').query) || ''; } catch (e) { q = ''; }
+      cb.onToolUse && cb.onToolUse(q);
+      cb.onSearch && cb.onSearch('pending');
+
+      searchWeb(q).then((res) => {
+        cb.onSearch && cb.onSearch('done', res.summary);
+        const next = msgs.concat([
+          { role: 'assistant', content: fullContent, tool_calls: toolCalls },
+          { role: 'tool', tool_call_id: tc.id, content: res.text },
+        ]);
+        runTurn(next, false); // 第二轮：不带工具，模型基于真实搜索结果作答
+      }).catch((err) => {
+        const em = (err && err.message) ? err.message : String(err);
+        cb.onSearch && cb.onSearch('error', em);
+        const next = msgs.concat([
+          { role: 'assistant', content: fullContent, tool_calls: toolCalls },
+          { role: 'tool', tool_call_id: tc.id, content: '搜索失败：' + em },
+        ]);
+        runTurn(next, false);
       });
-      pump();
-    }).catch((e) => {
-      const msg = e.message || String(e);
-      const hint = (msg.indexOf('fetch') >= 0 || msg.indexOf('Failed') >= 0 || msg.indexOf('Network') >= 0 || msg.indexOf('CORS') >= 0)
-        ? '\n（CORS 被浏览器拦截：file:// 页面无法调用外部 API。请将页面部署到 Web 服务器后使用 AI 增强功能，当前已切换本地模板解读）'
-        : '';
-      cb.onError && cb.onError(msg + hint);
-    });
+    }
+
+    runTurn(messages, true);
   }
 
   return { local, llm, buildChartContext, SYSTEM_PROMPT, currentDaXian };
